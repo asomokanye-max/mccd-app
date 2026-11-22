@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCCD Checker</title>
+<meta name="theme-color" content="#5B2245">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--blue:#5B2245;--bg:#f5f7fa;--line:#dde3ea;--mut:#5b6575;--red:#b3261e;--redbg:#fbe9e7;--amb:#8a5a00;--ambbg:#fff4dc;--grn:#1e7a46;--grnbg:#e6f4ec}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:#1d2430;line-height:1.45}
+header{background:var(--blue);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+header h1{margin:0;font-size:1.15rem}
+header .who{font-size:.8rem}
+header a{color:#fff}
+main{max-width:760px;margin:0 auto;padding:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.hidden{display:none!important}
+h2{font-size:1.05rem;margin:2px 0 10px}
+label{font-size:.8rem;color:var(--mut);display:block;margin-bottom:3px}
+input,select{font-size:1rem;padding:9px 10px;border:1px solid #b9c3cf;border-radius:8px;background:#fff;font-family:inherit;width:100%}
+input[type=checkbox]{width:auto}
+button{font-size:.95rem;padding:10px 14px;border-radius:8px;border:0;background:var(--blue);color:#fff;cursor:pointer;font-weight:600}
+button.sec{background:#e8eef5;color:var(--blue)}
+button:disabled{opacity:.5}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.hint{font-size:.82rem;color:var(--mut)}
+.err{color:var(--red);font-weight:600}.good{color:var(--grn);font-weight:600}
+.steps{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.steps span{font-size:.75rem;padding:4px 9px;border-radius:999px;background:#e8eef5;color:var(--blue)}
+.steps span.on{background:var(--blue);color:#fff}
+table.g{width:100%;border-collapse:collapse;font-size:.9rem}
+table.g th,table.g td{border:1px solid var(--line);padding:4px;text-align:left;vertical-align:middle}
+table.g th{background:#f0f3f7;font-weight:600;font-size:.8rem}
+table.g input{padding:7px;text-align:center;font-size:1rem}
+input.low{background:var(--ambbg);border-color:#d9a400}
+input.bad{background:var(--redbg);border-color:var(--red)}
+input.chg{outline:2px solid #2E75B6}
+.flag{border-left:4px solid var(--red);background:var(--redbg);padding:8px 10px;border-radius:6px;margin-bottom:6px;font-size:.9rem}
+.flag.warn{border-color:#d9a400;background:var(--ambbg)}
+.ok{border-left:4px solid var(--grn);background:var(--grnbg);padding:8px 10px;border-radius:6px;font-size:.9rem}
+img.ph{max-width:100%;border-radius:8px;border:1px solid var(--line)}
+textarea{font-size:1rem;padding:8px 10px;border:1px solid #b9c3cf;border-radius:8px;font-family:inherit;width:100%;resize:vertical}
+table.c{width:100%;border-collapse:collapse;font-size:.9rem}
+table.c th,table.c td{border:1px solid var(--line);padding:4px;vertical-align:top}
+table.c th{background:#f0f3f7;font-size:.78rem;text-align:left}
+table.c td.lab{width:64px;font-weight:600;font-size:.85rem}
+table.c td.int{width:30%}
+table.c input{padding:7px}
+.flag.info{border-color:#2E75B6;background:#eaf2fb}
+.uc{border:1px solid #2E75B6;background:#f3f8fd;border-radius:8px;padding:10px;margin-top:10px;font-size:.92rem}
+.warnbox{border-left:4px solid #d9a400;background:var(--ambbg);padding:8px 10px;border-radius:6px;font-size:.9rem;margin:6px 0}
+.src{font-size:.72rem;color:var(--mut);margin-left:4px}
+.pill{display:inline-block;font-size:.72rem;padding:1px 7px;border-radius:999px;background:#e8eef5;color:var(--blue)}
+</style>
+</head>
+<body>
+<header><div><h1>MCCD Checker</h1><div class="who">Check the medical certificate of cause of death before it is signed and coded · Pilot</div></div><div class="who" id="who"></div></header>
+<main>
+
+<div id="vLogin" class="card hidden">
+  <h2>Sign in</h2>
+  <div class="btns" style="margin-top:0"><button id="tIn">Log in</button><button id="tUp" class="sec">Create account</button></div>
+  <div style="height:10px"></div>
+  <div id="nameBox" class="hidden"><label for="nm">Full name</label><input id="nm" autocomplete="name"><div style="height:8px"></div></div>
+  <label for="em">Email</label><input id="em" type="email" autocomplete="username">
+  <div style="height:8px"></div>
+  <label for="pw">Password (at least 8 characters)</label><input id="pw" type="password" autocomplete="current-password">
+  <div class="btns"><button id="goIn">Log in</button></div>
+  <div id="inMsg" class="hint"></div>
+  <p class="hint">New accounts are approved by the administrator, who sets your role (doctor or coder) and hospital. Forgot your password? Ask the administrator.</p>
+</div>
+<div id="vPending" class="card hidden"><h2>No access to the MCCD Checker yet</h2><p>Your account is waiting for approval. The administrator will set your role (doctor or coder) and your hospital; then log out and in again.</p></div>
+
+<div id="vApp" class="hidden">
+  <div class="steps"><span data-s="1" class="on">1 Details</span><span data-s="2">2 Confirm reading</span><span data-s="3">3 Review and fix</span><span data-s="4">4 Saved</span></div>
+
+  <section id="s1" class="card">
+    <h2>New certificate</h2>
+    <p class="hint">Hospital: <b id="hosp"></b></p>
+    <div class="row">
+      <div><label for="ref">Certificate serial no. (optional, never a name)</label><input id="ref" maxlength="40"></div>
+      <div><label for="dmon">Month of death</label><input id="dmon" type="month"></div>
+    </div>
+    <div style="margin-top:8px"><label style="display:inline"><input type="checkbox" id="synth" checked> This is test data (invented certificate)</label></div>
+    <div class="warnbox"><b>Before the photo:</b> cover the name of the deceased, the doctor's name and signature, and any address. Only the cause-of-death section, age and sex are needed.</div>
+    <div class="btns">
+      <label class="hidden" for="photo">Photo</label>
+      <input id="photo" type="file" accept="image/*" capture="environment" class="hidden">
+      <button id="takePhoto">Take photo of the certificate</button>
+      <button id="manual" class="sec">Type it instead</button>
+    </div>
+    <p class="hint">The photo is read once by the AI service and is not stored.</p>
+    <div id="s1Msg" class="hint"></div>
+  </section>
+
+  <section id="s2" class="card hidden">
+    <h2 id="s2Title">Confirm the reading</h2>
+    <p class="hint" id="s2Hint"></p>
+    <img id="ph" class="ph hidden" alt="Photo of the certificate">
+    <div id="aiNote"></div>
+    <div class="row" style="margin:8px 0">
+      <div><label for="ageV">Age</label><div style="display:flex;gap:6px"><input id="ageV" inputmode="decimal" style="max-width:90px"><select id="ageU"><option>years</option><option>months</option><option>days</option><option>hours</option></select></div></div>
+      <div><label for="sex">Sex</label><select id="sex"><option value="">–</option><option value="male">Male</option><option value="female">Female</option><option value="unknown">Unknown</option></select></div>
+    </div>
+    <div id="grid"></div>
+    <div id="issues" style="margin-top:10px"></div>
+    <div id="ucBox"></div>
+    <div class="btns" id="s2Btns"></div>
+    <div id="s2Msg" class="hint"></div>
+  </section>
+
+  <section id="s4" class="card hidden">
+    <h2>Certificate checked and saved</h2>
+    <div id="sum"></div>
+    <div class="btns"><button id="again">Check another certificate</button></div>
+  </section>
+
+  <section class="card"><h2>Certificates checked</h2><div id="stats" class="hint"></div><div id="list" class="hint">…</div><div id="codePanel"></div></section>
+</div>
+</main>
+<footer>MCCD Checker pilot v0.1 · Institute of Public Health, Obafemi Awolowo University, Ile-Ife · No names stored; photos are not stored · AI suggestions must be confirmed by the doctor and a trained coder</footer>
+
+<script>
+const SUPABASE_URL="https://xzwjhbepttecghwvoogz.supabase.co";
+const SUPABASE_KEY="sb_publishable_eVkgrZ3ZM5XqWx-uLfR0rg_fluTH8Gi";
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const LINES=["a","b","c","d","II"];
+const LNAME={a:"I (a)",b:"I (b)",c:"I (c)",d:"I (d)",II:"Part II"};
+const LDESC={a:"Disease or condition directly leading to death",b:"Due to (or as a consequence of)",c:"Due to (or as a consequence of)",d:"Due to (or as a consequence of)",II:"Other significant conditions contributing to death, not related to the disease causing it"};
+
+// ================= rule checks (run in the browser, no AI) =================
+const EMPTY=/^\s*(blank|nil|none|null|n\/a|na|-+|–|—|\.)?\s*$/i;
+const isEmpty=t=>EMPTY.test(t||"");
+const MODE=/\b(cardio[- ]?pulmonary arrest|cardio[- ]?respiratory arrest|cardiac arrest|respiratory arrest|heart arrest|arrest|asystole|cardiac failure|heart failure|respiratory failure|brain death|shock)\b/i;
+const MODE_STRICT=/\b(arrest|asystole|brain death)\b/i;
+const ILL=/\b(old age|senility|senile|natural causes?|unknown|undetermined|not known|uncertain|debility|general weakness)\b/i;
+const OK_ABBR=new Set(["HIV","AIDS","COVID","SARS","MERS"]);
+function intervalMin(t){
+  if(isEmpty(t))return null;const s=String(t).toLowerCase().replace(/,/g,".");
+  const m=s.match(/(\d+(\.\d+)?)\s*(min|minute|h|hr|hour|d|day|w|wk|week|m|mo|mth|month|y|yr|year)/);
+  if(!m){if(/hour/.test(s))return 60;if(/day/.test(s))return 1440;if(/week/.test(s))return 10080;if(/month/.test(s))return 43200;if(/year/.test(s))return 525600;return null;}
+  const n=parseFloat(m[1]),u=m[3];
+  const f=u.startsWith("min")?1:/^h/.test(u)?60:/^d/.test(u)?1440:/^w/.test(u)?10080:/^(m|mo|mth|month)$/.test(u)?43200:525600;return n*f;
+}
+function rules(c){
+  const out=[],add=(rule,severity,line,message)=>out.push({rule,severity,line,message,src:"rule"});
+  const filled=["a","b","c","d"].filter(k=>!isEmpty(c.lines[k].t));
+  if(!filled.length){add("no_cause","error","all","Part I is empty. Write the disease or condition that led to death on line (a), and its causes on the lines below.");return out;}
+  if(isEmpty(c.lines.a.t))add("line_a_empty","error","a","Line (a) is empty but lower lines are filled. The condition directly leading to death must be on line (a); move the entries up so there is no empty line above them.");
+  const lowest=filled[filled.length-1];
+  ["a","b","c"].forEach((k,i)=>{const nx=["b","c","d"][i];if(isEmpty(c.lines[k].t)&&!isEmpty(c.lines[nx].t)&&k!=="a")add("gap","warn",k,`Line (${k}) is empty but line (${nx}) is filled. Do not leave a gap in the sequence.`);});
+  [...filled,...(isEmpty(c.lines.II.t)?[]:["II"])].forEach(k=>{
+    const t=c.lines[k].t,L=LNAME[k];
+    if(isEmpty(c.lines[k].i))add("missing_interval","warn",k,`${L}: no time interval. Write the approximate time from onset to death (e.g. 3 days, 2 years).`);
+    if(/[,;+\/]|\band\b|&/i.test(t))add("multiple_on_line","warn",k,`${L} "${t}" seems to contain more than one condition. Write only one condition per line; put the others on their own lines in the sequence, or in Part II.`);
+    const ab=(t.match(/\b[A-Z]{2,6}\b/g)||[]).filter(x=>!OK_ABBR.has(x));
+    if(ab.length)add("abbreviation","warn",k,`${L}: abbreviation${ab.length>1?"s":""} ${ab.join(", ")}. Write the condition${ab.length>1?"s":""} in full.`);
+  });
+  const lt=c.lines[lowest].t;
+  if(MODE_STRICT.test(lt)||(MODE.test(lt)&&filled.length===1))add("mode_of_dying","error",lowest,`"${lt}" is a mode of dying, not a cause of death. Write the disease or injury that caused it on the line below${lowest==="d"?"":" (line "+String.fromCharCode(lowest.charCodeAt(0)+1)+")"}.`);
+  else filled.filter(k=>k!==lowest&&MODE_STRICT.test(c.lines[k].t)).forEach(k=>add("mode_of_dying","info",k,`${LNAME[k]} "${c.lines[k].t}" is a mode of dying and adds nothing to the cause of death; it can be left out.`));
+  if(ILL.test(lt))add("ill_defined","error",lowest,`"${lt}" is ill-defined as the underlying cause. Write the specific disease or condition that started the sequence.`);
+  for(let i=0;i<filled.length-1;i++){const up=filled[i],dn=filled[i+1],a=intervalMin(c.lines[up].i),b=intervalMin(c.lines[dn].i);
+    if(a!==null&&b!==null&&b<a)add("interval_order","error",dn,`${LNAME[dn]} has a shorter interval (${c.lines[dn].i}) than ${LNAME[up]} above it (${c.lines[up].i}). A cause must start before the condition it causes, so the order may be reversed.`);}
+  if(c.age_value===null||c.age_value==="")add("age_missing","warn","all","Age is missing.");
+  if(!c.sex)add("sex_missing","warn","all","Sex is missing.");
+  return out;
+}
+
+// ================= state =================
+let ME=null,C=null,STAGE=null;
+// C={mode,model,synthetic,local_ref,death_month,ai:{k:{t,i,c}},paper:{k:{t,i}},final:{k:{t,i}},age_value,age_unit,sex,first:[],final_flags:[],uc:null,improved:null,started}
+
+// ================= auth =================
+let SIGNUP=false;
+$("tIn").onclick=()=>{SIGNUP=false;$("tIn").className="";$("tUp").className="sec";$("nameBox").classList.add("hidden");$("goIn").textContent="Log in";};
+$("tUp").onclick=()=>{SIGNUP=true;$("tUp").className="";$("tIn").className="sec";$("nameBox").classList.remove("hidden");$("goIn").textContent="Create account";};
+$("goIn").onclick=async()=>{const email=$("em").value.trim(),password=$("pw").value;
+  if(SIGNUP){if(!$("nm").value.trim()||password.length<8){$("inMsg").innerHTML='<span class="err">Enter your full name and a password of at least 8 characters.</span>';return;}
+    const r=await db.auth.signUp({email,password,options:{data:{full_name:$("nm").value.trim()},emailRedirectTo:location.origin+location.pathname}});
+    if(r.error){$("inMsg").innerHTML='<span class="err">'+esc(r.error.message)+'</span>';return;}
+    if(!r.data.session){$("inMsg").innerHTML='<span class="good">Account created. Check your email to confirm it, then log in. The administrator will then give you access.</span>';return;}
+    start();return;}
+  const {error}=await db.auth.signInWithPassword({email,password});
+  if(error){$("inMsg").innerHTML='<span class="err">'+esc(error.message)+'</span>';return;}start();};
+async function start(){
+  const {data:{session}}=await db.auth.getSession();
+  ["vLogin","vPending","vApp"].forEach(v=>$(v).classList.add("hidden"));
+  if(!session){$("vLogin").classList.remove("hidden");return;}
+  const {data:p}=await db.from("profiles").select("*").eq("user_id",session.user.id).maybeSingle();
+  ME=p||{role:"pending"};
+  $("who").innerHTML=esc(ME.full_name||ME.email||"")+" · "+esc(ME.role)+' · <a href="#" id="lo">Log out</a>';
+  $("lo").onclick=async e=>{e.preventDefault();await db.auth.signOut();location.reload();};
+  if(!["doctor","coder","admin","state"].includes(ME.role)){$("vPending").classList.remove("hidden");return;}
+  $("vApp").classList.remove("hidden");
+  if(ME.role==="state"){$("s1").classList.add("hidden");document.querySelector(".steps").classList.add("hidden");}
+  $("hosp").textContent=ME.facility||(ME.role==="admin"?"Admin test (set your hospital in the Admin tab to use one)":"not set: ask the administrator");
+  const d=new Date();$("dmon").value=d.toISOString().slice(0,7);
+  loadList();
+}
+
+// ================= step 1 =================
+function blankLines(){const o={};LINES.forEach(k=>o[k]={t:"",i:""});return o;}
+function details(){
+  if(["doctor","coder"].includes(ME.role)&&!ME.facility){$("s1Msg").innerHTML='<span class="err">Your hospital has not been set. Ask the administrator.</span>';return null;}
+  return {synthetic:$("synth").checked,local_ref:$("ref").value.trim(),death_month:$("dmon").value?$("dmon").value+"-01":"",
+    ai:{},paper:blankLines(),final:blankLines(),age_value:"",age_unit:"years",sex:"",first:[],final_flags:[],uc:null,improved:null,started:Date.now(),reviews:0};
+}
+$("takePhoto").onclick=()=>{if(details())$("photo").click();};
+$("manual").onclick=()=>{const c=details();if(!c)return;C={...c,mode:"manual",model:null};$("ph").classList.add("hidden");showStage("confirm");};
+$("photo").onchange=async()=>{
+  const file=$("photo").files[0];if(!file)return;const c=details();if(!c)return;
+  C={...c,mode:"photo"};$("s1Msg").innerHTML='<span class="hint">Preparing the photo…</span>';
+  try{
+    const {b64,url}=await shrink(file,1800);
+    $("ph").src=url;$("ph").classList.remove("hidden");
+    $("s1Msg").innerHTML='<span class="hint">Reading the certificate… (about 10 to 20 seconds)</span>';
+    $("takePhoto").disabled=$("manual").disabled=true;
+    const {data,error}=await db.functions.invoke("mccd-ai",{body:{action:"read",image:b64,media_type:"image/jpeg"}});
+    $("takePhoto").disabled=$("manual").disabled=false;$("photo").value="";
+    const m=await errMsg(data,error);
+    if(m){$("s1Msg").innerHTML='<span class="err">Reading failed: '+esc(m)+'</span> You can try again, or type it instead.';return;}
+    C.model=data.model;
+    LINES.forEach(k=>{const x=(data.lines||{})[k]||{};let t=String(x.t??"").trim(),i=String(x.i??"").trim();if(isEmpty(t))t="";if(isEmpty(i))i="";
+      C.ai[k]={t,i,c:x.c==="high"?"high":"low"};C.paper[k]={t,i};});
+    const ag=String(data.age||"");const am=ag.match(/(\d+(\.\d+)?)/);C.age_value=am?am[1]:"";
+    C.age_unit=/month|mth|mo\b/i.test(ag)?"months":/day/i.test(ag)?"days":/hour|hr/i.test(ag)?"hours":"years";
+    C.sex=["male","female","unknown"].includes(String(data.sex||"").toLowerCase())?String(data.sex).toLowerCase():"";
+    C.ai_age=C.age_value;C.ai_sex=C.sex;
+    C.note=data.notes||"";C.names_visible=!!data.names_visible;$("s1Msg").textContent="";
+    showStage("confirm");
+  }catch(e){$("takePhoto").disabled=$("manual").disabled=false;$("s1Msg").innerHTML='<span class="err">'+esc(e.message)+'</span>';}
+};
+async function errMsg(data,error){let m=data&&data.error;if(!m&&error){try{m=(await error.context.json()).error;}catch(e){m=error.message;}}if(!m&&!data)m="no reply";return m||null;}
+function shrink(file,max){return new Promise((res,rej)=>{const img=new Image();const url=URL.createObjectURL(file);
+  img.onload=()=>{let w=img.width,h=img.height;const s=Math.min(1,max/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);
+    const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);
+    const d=cv.toDataURL("image/jpeg",0.85);res({b64:d.split(",")[1],url});};
+  img.onerror=()=>rej(new Error("Could not open the photo."));img.src=url;});}
+
+// ================= steps 2 and 3 =================
+function setSteps(n){document.querySelectorAll(".steps span").forEach(s=>s.classList.toggle("on",+s.dataset.s===n));}
+function certFrom(lines){return {lines,age_value:C.age_value,age_unit:C.age_unit,sex:C.sex};}
+function showStage(st){
+  STAGE=st;$("s1").classList.add("hidden");$("s4").classList.add("hidden");$("s2").classList.remove("hidden");$("s2Msg").textContent="";
+  $("ageV").value=C.age_value;$("ageU").value=C.age_unit;$("sex").value=C.sex;
+  if(st==="confirm"){setSteps(2);
+    $("s2Title").textContent=C.mode==="photo"?"Step 2: confirm the reading":"Step 2: type the certificate";
+    $("s2Hint").innerHTML=C.mode==="photo"?"Compare each line with the <b>paper certificate</b>. Correct any word that was read wrongly so the boxes match exactly what is written, even if the certificate itself has a mistake. Yellow boxes are readings the AI was unsure about.":"Type each line exactly as written on the paper certificate, including abbreviations. Leave empty lines empty.";
+    $("aiNote").innerHTML=(C.names_visible?'<div class="warnbox"><b>A name was visible in this photo.</b> Next time, cover the names before taking the photo. The name was not saved.</div>':"")+(C.note?'<p class="hint">AI note: '+esc(C.note)+'</p>':"");
+    $("issues").innerHTML="";$("ucBox").innerHTML="";
+    drawGrid(C.paper);
+    $("s2Btns").innerHTML='<button id="toCheck">The text matches the paper: check the certificate</button><button class="sec" id="cancel">Cancel</button>';
+    $("toCheck").onclick=async()=>{readGrid(C.paper);readMeta();C.final=JSON.parse(JSON.stringify(C.paper));await review(true);};
+    $("cancel").onclick=reset;
+  }else{setSteps(3);
+    $("s2Title").textContent="Step 3: review and fix";
+    $("s2Hint").innerHTML="Read each problem. The <b>certifying doctor</b> corrects the paper certificate, then the same change is made here (blue outline = changed). Click <b>Check again</b> after changes, then <b>Save</b>.";
+    $("aiNote").innerHTML="";
+    drawGrid(C.final,C.paper);drawIssues();drawUC();
+    $("s2Btns").innerHTML='<button class="sec" id="recheck">Check again</button><button id="save">Save checked certificate</button><button class="sec" id="back">Back to step 2</button>'+
+      `<div style="width:100%"><label for="mins">Minutes spent on this certificate (optional)</label><input id="mins" type="number" min="1" max="300" style="max-width:140px"></div>`;
+    $("recheck").onclick=async()=>{readGrid(C.final);readMeta();await review(false);};
+    $("back").onclick=()=>showStage("confirm");
+    $("save").onclick=async()=>{readGrid(C.final);readMeta();C.final_flags=mergeIssues(rules(certFrom(C.final)),C.lastAI||[]);
+      if(C.final_flags.some(x=>x.severity==="error")&&!confirm("Some errors are still on the certificate. Save anyway? (Choose OK only if the certificate is being returned to the doctor, or the errors were checked.)"))return;
+      await save();};
+  }
+}
+function readMeta(){C.age_value=$("ageV").value.trim();C.age_unit=$("ageU").value;C.sex=$("sex").value;}
+function drawGrid(vals,orig){
+  const low=k=>STAGE==="confirm"&&C.mode==="photo"&&C.ai[k]&&C.ai[k].c==="low"&&(C.ai[k].t||C.ai[k].i);
+  const bad={};(STAGE==="fix"?C.final_flags:[]).forEach(f=>{if(f.severity==="error")bad[f.line]=1;});
+  const cls=(k,f)=>[low(k)?"low":"",bad[k]?"bad":"",orig&&(orig[k][f]||"")!==(vals[k][f]||"")?"chg":""].join(" ");
+  $("grid").innerHTML=`<table class="c"><tr><th></th><th>Condition</th><th>Interval (onset to death)</th></tr>${LINES.map(k=>`<tr>
+    <td class="lab">${LNAME[k]}<div class="hint" style="font-weight:400">${k==="a"?"direct cause":k==="II"?"contributing":"due to"}</div></td>
+    <td><input data-k="${k}" data-f="t" class="${cls(k,"t")}" value="${esc(vals[k].t)}" aria-label="${LNAME[k]} condition: ${esc(LDESC[k])}"></td>
+    <td class="int"><input data-k="${k}" data-f="i" class="${cls(k,"i")}" value="${esc(vals[k].i)}" aria-label="${LNAME[k]} interval"></td></tr>`).join("")}</table>`;
+}
+function readGrid(target){document.querySelectorAll("#grid input").forEach(i=>{let v=i.value.trim();if(isEmpty(v))v="";target[i.dataset.k][i.dataset.f]=v;});}
+function mergeIssues(local,ai){
+  const seen=new Set(local.map(x=>x.rule+"|"+x.line));
+  const extra=(ai||[]).filter(x=>x&&x.message&&!seen.has(x.rule+"|"+x.line)&&!(x.rule==="abbreviation"&&local.some(l=>l.rule==="abbreviation")))
+    .map(x=>({rule:String(x.rule||"other").slice(0,40),severity:["error","warn","info"].includes(x.severity)?x.severity:"warn",line:String(x.line||"all"),message:String(x.message).slice(0,400),src:"ai"}));
+  const ord={error:0,warn:1,info:2};return [...local,...extra].sort((a,b)=>ord[a.severity]-ord[b.severity]);
+}
+async function review(first){
+  const local=rules(certFrom(C.final));
+  $("s2Msg").innerHTML='<span class="hint">Checking… the rule checks are done; the AI review takes about 10 to 30 seconds.</span>';
+  document.querySelectorAll("#s2Btns button").forEach(b=>b.disabled=true);
+  let ai=null,m=null;
+  try{
+    const cert={age:C.age_value?C.age_value+" "+C.age_unit:"",sex:C.sex,lines:{}};LINES.forEach(k=>cert.lines[k]={t:C.final[k].t,i:C.final[k].i});
+    const r=await db.functions.invoke("mccd-ai",{body:{action:"review",cert}});m=await errMsg(r.data,r.error);if(!m)ai=r.data;
+  }catch(e){m=e.message;}
+  C.reviews++;
+  C.lastAI=ai?ai.issues||[]:[];
+  if(ai){C.uc=ai.underlying_cause||null;C.improved=ai.improved||null;C.codable=ai.codable;C.review_model=ai.model;}
+  C.aiFailed=m;
+  const all=mergeIssues(local,C.lastAI);
+  if(first)C.first=all;
+  C.final_flags=all;
+  showStage("fix");
+  if(m)$("s2Msg").innerHTML='<span class="err">AI review not available: '+esc(m)+'</span> The rule checks above still apply.';
+}
+function drawIssues(){
+  const fl=C.final_flags;
+  $("issues").innerHTML=fl.length?`<p class="hint"><b>${fl.length} point(s)</b> to look at${C.first.length&&fl.length<C.first.length?` (down from ${C.first.length})`:""}:</p>`+
+    fl.map(x=>`<div class="flag ${x.severity==="warn"?"warn":x.severity==="info"?"info":""}">${x.severity==="error"?"Error":x.severity==="warn"?"Improve":"Note"}${x.line&&x.line!=="all"?" · "+LNAME[x.line]:""}: ${esc(x.message)}<span class="src">${x.src==="ai"?"AI review":"rule check"}</span></div>`).join(""):
+    `<div class="ok">No problems found${C.first.length?` (${C.first.length} found at first check were fixed)`:""}.</div>`;
+}
+function drawUC(){
+  if(!C.uc&&!C.improved){$("ucBox").innerHTML="";return;}
+  const u=C.uc||{};
+  const imp=C.improved&&LINES.some(k=>(C.improved[k]||"").trim())?`<div style="margin-top:8px"><b>Suggested wording</b> (uses only the conditions already written):
+    <table class="c" style="margin-top:4px">${LINES.filter(k=>(C.improved[k]||"").trim()).map(k=>`<tr><td class="lab">${LNAME[k]}</td><td>${esc(C.improved[k])}</td></tr>`).join("")}</table>
+    <div class="btns"><button class="sec" id="useImp">Copy this wording into the boxes</button></div>
+    <p class="hint">Only use it if the certifying doctor agrees and corrects the paper certificate the same way. Check the intervals after copying.</p></div>`:"";
+  $("ucBox").innerHTML=`<div class="uc"><b>Suggested underlying cause</b> <span class="pill">for the coder to confirm</span><br>
+    ${C.codable===false?'<span class="err">Not codable as written.</span> ':""}${esc(u.text||"–")}<br>
+    ICD-10: <b>${esc(u.icd10||"–")}</b> · ICD-11: <b>${esc(u.icd11||"–")}</b> · confidence: ${esc(u.confidence||"–")}
+    ${u.reason?`<div class="hint" style="margin-top:4px">${esc(u.reason)}</div>`:""}${imp}</div>`;
+  const b=$("useImp");if(b)b.onclick=()=>{readGrid(C.final);const prev=JSON.parse(JSON.stringify(C.final));LINES.forEach(k=>{const t=(C.improved[k]||"").trim();
+    const src=t?LINES.find(o=>prev[o].t&&prev[o].t.toLowerCase()===t.toLowerCase()):null;
+    C.final[k]={t,i:t&&src?prev[src].i:""};});
+    drawGrid(C.final,C.paper);$("s2Msg").innerHTML='<span class="hint">Wording copied. Check the intervals, then click Check again.</span>';};
+}
+async function save(){
+  $("save").disabled=true;
+  const strip=f=>({rule:f.rule,severity:f.severity,line:f.line,message:(f.src==="ai"?"[AI] ":"")+f.message});
+  const status=C.final_flags.some(x=>x.severity==="error")?"returned":"checked";
+  const payload={local_ref:C.local_ref,death_month:C.death_month,age_value:C.age_value,age_unit:C.age_value?C.age_unit:"",sex:C.sex,
+    mode:C.mode,model:[C.model,C.review_model].filter(Boolean).join(" + "),synthetic:C.synthetic,status,minutes:$("mins")&&$("mins").value?$("mins").value:"",
+    uc:{text:C.uc&&C.uc.text||"",icd10:C.uc&&C.uc.icd10||"",icd11:C.uc&&C.uc.icd11||""},
+    lines:LINES.map(k=>Object.assign({line:k,paper:C.paper[k].t,paper_int:C.paper[k].i,final:C.final[k].t,final_int:C.final[k].i},
+      C.mode==="photo"?{ai:C.ai[k].t,ai_int:C.ai[k].i,conf:C.ai[k].c}:{})),
+    first:C.first.map(strip),final:C.final_flags.map(strip)};
+  const {error}=await db.rpc("mccd_save",{p_cert:payload});
+  if(error){$("s2Msg").innerHTML='<span class="err">'+esc(error.message)+'</span>';$("save").disabled=false;return;}
+  const used=LINES.filter(k=>C.paper[k].t||C.paper[k].i||(C.mode==="photo"&&(C.ai[k].t||C.ai[k].i)));
+  const mis=C.mode==="photo"?used.filter(k=>(C.ai[k].t||"").toLowerCase()!==(C.paper[k].t||"").toLowerCase()||(C.ai[k].i||"").toLowerCase()!==(C.paper[k].i||"").toLowerCase()).length:0;
+  const chg=LINES.filter(k=>C.paper[k].t!==C.final[k].t||C.paper[k].i!==C.final[k].i).length;
+  $("s2").classList.add("hidden");$("s4").classList.remove("hidden");setSteps(4);
+  $("sum").innerHTML=`<ul>
+    ${C.mode==="photo"?`<li>AI reading: <b>${used.length-mis} of ${used.length}</b> filled lines read correctly${used.length?` (${Math.round(100*(used.length-mis)/used.length)}%)`:""}.</li>`:"<li>Certificate typed by hand.</li>"}
+    <li>Problems at first check: <b>${C.first.length}</b> (errors: ${C.first.filter(x=>x.severity==="error").length}); still open: <b>${C.final_flags.length}</b> (errors: ${C.final_flags.filter(x=>x.severity==="error").length}).</li>
+    <li>Lines changed by the doctor: <b>${chg}</b>.</li>
+    <li>Suggested underlying cause: ${esc(C.uc&&C.uc.text||"–")} (ICD-10 ${esc(C.uc&&C.uc.icd10||"–")}).</li>
+    <li>Saved as: <b>${status==="returned"?"returned to the doctor (errors remain)":"checked, waiting for the coder"}</b>.</li></ul>`;
+  loadList();
+}
+function reset(){C=null;$("s2").classList.add("hidden");$("s4").classList.add("hidden");$("s1").classList.remove("hidden");setSteps(1);$("s1Msg").textContent="";$("ref").value="";}
+$("again").onclick=reset;
+
+// ================= list and coding =================
+let LIST=[];
+const STAT={checked:"waiting for coder",returned:"returned to doctor",accepted:"accepted",coded:"coded"};
+async function loadList(){
+  const {data,error}=await db.from("mccd_certs").select("*").order("created_at",{ascending:false}).limit(50);
+  if(error){$("list").innerHTML='<span class="err">'+esc(error.message)+'</span>';return;}
+  LIST=data||[];
+  if(!LIST.length){$("list").textContent="No certificates checked yet.";$("stats").textContent="";return;}
+  const {data:lines}=await db.from("mccd_lines").select("cert_id,ai_text,ai_interval,paper_text,paper_interval").in("cert_id",LIST.filter(c=>c.entry_mode==="photo").map(c=>c.id));
+  const used=(lines||[]).filter(l=>l.ai_text||l.ai_interval||l.paper_text||l.paper_interval);
+  const ok=used.filter(l=>(l.ai_text||"").toLowerCase()===(l.paper_text||"").toLowerCase()&&(l.ai_interval||"").toLowerCase()===(l.paper_interval||"").toLowerCase()).length;
+  const coded=LIST.filter(c=>c.coder_agrees!==null);const agree=coded.filter(c=>c.coder_agrees).length;
+  const withErr=LIST.filter(c=>c.n_flags_first>0).length;
+  $("stats").innerHTML=`<p>${LIST.length} certificate(s); ${withErr} had at least one problem at first check.
+    ${used.length?` AI reading: <b>${Math.round(100*ok/used.length)}%</b> of ${used.length} filled lines read correctly.`:""}
+    ${coded.length?` Coder agreed with the AI underlying cause on <b>${agree} of ${coded.length}</b>.`:""}</p>`;
+  const canCode=["coder","admin"].includes(ME.role);
+  $("list").innerHTML=`<table class="g"><tr><th>Checked</th><th>Age/sex</th><th>Suggested UC (ICD-10)</th><th>Problems first → last</th><th>Status</th><th>Final code</th>${canCode?"<th></th>":""}</tr>${LIST.map(c=>`<tr>
+    <td>${new Date(c.created_at).toLocaleDateString()}${c.synthetic?" (test)":""}<div class="hint">${esc(c.local_ref||"")} · ${esc(c.checked_as)}</div></td>
+    <td>${c.age_value??"–"} ${esc(c.age_unit||"")} ${esc((c.sex||"").slice(0,1).toUpperCase())}</td>
+    <td>${esc(c.uc_text_ai||"–")} <b>${esc(c.uc_icd10_ai||"")}</b></td>
+    <td>${c.n_flags_first} → ${c.n_flags_final}</td><td>${esc(STAT[c.status]||c.status)}</td>
+    <td>${esc(c.uc_icd10_final||"")}${c.uc_icd11_final?" / "+esc(c.uc_icd11_final):""}${c.coder_agrees===false?' <span class="pill">changed</span>':""}</td>
+    ${canCode?`<td><button class="sec" data-code="${c.id}" style="padding:6px 10px">Code</button></td>`:""}</tr>`).join("")}</table>`;
+  document.querySelectorAll("[data-code]").forEach(b=>b.onclick=()=>openCode(b.dataset.code));
+}
+async function openCode(id){
+  const c=LIST.find(x=>x.id===id);if(!c)return;
+  const {data:ls}=await db.from("mccd_lines").select("*").eq("cert_id",id);
+  const by={};(ls||[]).forEach(l=>by[l.line]=l);
+  $("codePanel").innerHTML=`<div class="uc" style="margin-top:12px"><h2 style="margin:0 0 6px">Code this certificate</h2>
+    <table class="c">${LINES.filter(k=>by[k]&&(by[k].final_text||by[k].final_interval)).map(k=>`<tr><td class="lab">${LNAME[k]}</td><td>${esc(by[k].final_text)}</td><td class="int">${esc(by[k].final_interval)}</td></tr>`).join("")||'<tr><td>No text.</td></tr>'}</table>
+    <p class="hint">Age/sex: ${c.age_value??"–"} ${esc(c.age_unit||"")} ${esc(c.sex||"")}. AI suggestion: ${esc(c.uc_text_ai||"–")} · ICD-10 ${esc(c.uc_icd10_ai||"–")} · ICD-11 ${esc(c.uc_icd11_ai||"–")}</p>
+    <label for="cText">Underlying cause (your decision)</label><input id="cText" value="${esc(c.uc_text_final||c.uc_text_ai||"")}">
+    <div class="row" style="margin-top:8px"><div><label for="c10">ICD-10 code</label><input id="c10" value="${esc(c.uc_icd10_final||c.uc_icd10_ai||"")}"></div>
+      <div><label for="c11">ICD-11 code</label><input id="c11" value="${esc(c.uc_icd11_final||c.uc_icd11_ai||"")}"></div></div>
+    <div class="row" style="margin-top:8px"><div><label for="cAgree">Do you agree with the AI suggestion?</label><select id="cAgree"><option value="true">Yes, as suggested</option><option value="false">No, I changed it</option></select></div>
+      <div><label for="cStat">Outcome</label><select id="cStat"><option value="coded">Coded</option><option value="accepted">Accepted, coding later</option><option value="returned">Return to the doctor</option></select></div></div>
+    <label for="cNote" style="margin-top:8px">Note (optional)</label><textarea id="cNote" rows="2">${esc(c.coder_note||"")}</textarea>
+    <div class="btns"><button id="cSave">Save</button><button class="sec" id="cClose">Close</button></div><div id="cMsg" class="hint"></div></div>`;
+  if(c.coder_agrees===false)$("cAgree").value="false";
+  $("cClose").onclick=()=>$("codePanel").innerHTML="";
+  $("cSave").onclick=async()=>{
+    const {error}=await db.rpc("mccd_code",{p_cert:id,p_status:$("cStat").value,p_text:$("cText").value,p_icd10:$("c10").value,p_icd11:$("c11").value,p_agrees:$("cAgree").value==="true",p_note:$("cNote").value});
+    if(error){$("cMsg").innerHTML='<span class="err">'+esc(error.message)+'</span>';return;}
+    $("codePanel").innerHTML='<p class="good">Saved.</p>';loadList();};
+  const cp=$("codePanel");if(cp.scrollIntoView)cp.scrollIntoView({behavior:"smooth"});
+}
+start();
+if(navigator.serviceWorker&&navigator.serviceWorker.register)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
