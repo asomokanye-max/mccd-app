@@ -125,7 +125,7 @@ footer{text-align:center;font-size:.72rem;color:var(--mut);padding:10px 14px 24p
   <section class="card"><h2>Certificates checked</h2><div id="stats" class="hint"></div><div id="list" class="hint">…</div><div id="codePanel"></div></section>
 </div>
 </main>
-<footer>MCCD Checker pilot v0.2 · Institute of Public Health, Obafemi Awolowo University, Ile-Ife · No names stored; photos are not stored · AI suggestions must be confirmed by the doctor and a trained coder</footer>
+<footer>MCCD Checker pilot v0.3 · Institute of Public Health, Obafemi Awolowo University, Ile-Ife · No names stored; photos are not stored · AI suggestions must be confirmed by the doctor and a trained coder</footer>
 
 <script>
 const SUPABASE_URL="https://xzwjhbepttecghwvoogz.supabase.co";
@@ -377,42 +377,58 @@ async function loadList(){
   const used=(lines||[]).filter(l=>l.ai_text||l.ai_interval||l.paper_text||l.paper_interval);
   const ok=used.filter(l=>(l.ai_text||"").toLowerCase()===(l.paper_text||"").toLowerCase()&&(l.ai_interval||"").toLowerCase()===(l.paper_interval||"").toLowerCase()).length;
   const coded=LIST.filter(c=>c.coder_agrees!==null);const agree=coded.filter(c=>c.coder_agrees).length;
+  const bc=coded.filter(c=>/^\[blind\]/.test(c.coder_note||""));const ba=bc.filter(c=>c.coder_agrees).length;
   const withErr=LIST.filter(c=>c.n_flags_first>0).length;
   $("stats").innerHTML=`<p>${LIST.length} certificate(s); ${withErr} had at least one problem at first check.
     ${used.length?` AI reading: <b>${Math.round(100*ok/used.length)}%</b> of ${used.length} filled lines read correctly.`:""}
-    ${coded.length?` Coder agreed with the AI underlying cause on <b>${agree} of ${coded.length}</b>.`:""}</p>`;
+    ${coded.length?` Coder agreed with the AI underlying cause on <b>${agree} of ${coded.length}</b>.`:""}
+    ${bc.length?` Blind coding: same ICD-10 code as the AI on <b>${ba} of ${bc.length}</b>.`:""}</p>`;
   const canCode=["coder","admin"].includes(ME.role);
-  $("list").innerHTML=`<table class="g"><tr><th>Checked</th><th>Age/sex</th><th>Suggested UC (ICD-10)</th><th>Problems first → last</th><th>Status</th><th>Final code</th>${canCode?"<th></th>":""}</tr>${LIST.map(c=>`<tr>
+  const bl=canCode?`<label style="display:inline;font-weight:400"><input type="checkbox" id="blindBox" ${blindOn()?"checked":""}> Blind coding: hide the AI suggestion until the coder has saved their own code (use this for the study)</label>`:"";
+  $("list").innerHTML=bl+`<table class="g" style="margin-top:8px"><tr><th>Checked</th><th>Age/sex</th><th>Suggested UC (ICD-10)</th><th>Problems first → last</th><th>Status</th><th>Final code</th>${canCode?"<th></th>":""}</tr>${LIST.map(c=>`<tr>
     <td>${new Date(c.created_at).toLocaleDateString()}${c.synthetic?" (test)":""}<div class="hint">${esc(c.local_ref||"")} · ${esc(c.checked_as)}</div></td>
     <td>${c.age_value??"–"} ${esc(c.age_unit||"")} ${esc((c.sex||"").slice(0,1).toUpperCase())}</td>
-    <td>${esc(c.uc_text_ai||"–")} <b>${esc(c.uc_icd10_ai||"")}</b></td>
+    <td>${blindOn()&&canCode&&c.coder_agrees===null?'<span class="hint">hidden until coded</span>':`${esc(c.uc_text_ai||"–")} <b>${esc(c.uc_icd10_ai||"")}</b>`}</td>
     <td>${c.n_flags_first} → ${c.n_flags_final}</td><td>${esc(STAT[c.status]||c.status)}</td>
     <td>${esc(c.uc_icd10_final||"")}${c.uc_icd11_final?" / "+esc(c.uc_icd11_final):""}${c.coder_agrees===false?' <span class="pill">changed</span>':""}</td>
     ${canCode?`<td><button class="sec" data-code="${c.id}" style="padding:6px 10px">Code</button></td>`:""}</tr>`).join("")}</table>`;
   document.querySelectorAll("[data-code]").forEach(b=>b.onclick=()=>openCode(b.dataset.code));
+  const bb=$("blindBox");if(bb)bb.onchange=()=>{setBlind(bb.checked);$("codePanel").innerHTML="";loadList();};
 }
+function blindOn(){try{const v=localStorage.getItem("mccd_blind");if(v!==null)return v==="1";}catch(e){}return ME&&ME.role==="coder";}
+function setBlind(on){try{localStorage.setItem("mccd_blind",on?"1":"0");}catch(e){}}
+const norm10=x=>String(x||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
 async function openCode(id){
   const c=LIST.find(x=>x.id===id);if(!c)return;
+  const blind=blindOn()&&c.coder_agrees===null;
   const {data:ls}=await db.from("mccd_lines").select("*").eq("cert_id",id);
   const by={};(ls||[]).forEach(l=>by[l.line]=l);
-  $("codePanel").innerHTML=`<div class="uc" style="margin-top:12px"><h2 style="margin:0 0 6px">Code this certificate</h2>
+  const aiLine=`AI suggestion: ${esc(c.uc_text_ai||"–")} · ICD-10 <b>${esc(c.uc_icd10_ai||"–")}</b> · ICD-11 ${esc(c.uc_icd11_ai||"–")}`;
+  $("codePanel").innerHTML=`<div class="uc" style="margin-top:12px"><h2 style="margin:0 0 6px">Code this certificate${blind?' <span class="pill">blind coding</span>':""}</h2>
     <table class="c">${LINES.filter(k=>by[k]&&(by[k].final_text||by[k].final_interval)).map(k=>`<tr><td class="lab">${LNAME[k]}</td><td>${esc(by[k].final_text)}</td><td class="int">${esc(by[k].final_interval)}</td></tr>`).join("")||'<tr><td>No text.</td></tr>'}</table>
-    <p class="hint">Age/sex: ${c.age_value??"–"} ${esc(c.age_unit||"")} ${esc(c.sex||"")}. AI suggestion: ${esc(c.uc_text_ai||"–")} · ICD-10 ${esc(c.uc_icd10_ai||"–")} · ICD-11 ${esc(c.uc_icd11_ai||"–")}</p>
-    <label for="cText">Underlying cause (your decision)</label><input id="cText" value="${esc(c.uc_text_final||c.uc_text_ai||"")}">
-    <div class="row" style="margin-top:8px"><div><label for="c10">ICD-10 code</label><input id="c10" value="${esc(c.uc_icd10_final||c.uc_icd10_ai||"")}"></div>
-      <div><label for="c11">ICD-11 code</label><input id="c11" value="${esc(c.uc_icd11_final||c.uc_icd11_ai||"")}"></div></div>
-    ${icdLinks(c.uc_icd10_final||c.uc_icd10_ai)}
+    <p class="hint">Age/sex: ${c.age_value??"–"} ${esc(c.age_unit||"")} ${esc(c.sex||"")}.${blind?" The AI suggestion is hidden until you save your own code.":" "+aiLine}</p>
+    <label for="cText">Underlying cause (your decision)</label><input id="cText" value="${esc(c.uc_text_final||(blind?"":c.uc_text_ai)||"")}">
+    <div class="row" style="margin-top:8px"><div><label for="c10">ICD-10 code</label><input id="c10" value="${esc(c.uc_icd10_final||(blind?"":c.uc_icd10_ai)||"")}"></div>
+      <div><label for="c11">ICD-11 code</label><input id="c11" value="${esc(c.uc_icd11_final||(blind?"":c.uc_icd11_ai)||"")}"></div></div>
+    <div id="icdL">${icdLinks(c.uc_icd10_final||(blind?"":c.uc_icd10_ai))}</div>
     <p class="hint">Look up or confirm the code in WHO's official browsers. For mortality, apply the ICD-10 Volume 2 / ICD-11 Reference Guide selection rules.</p>
-    <div class="row" style="margin-top:8px"><div><label for="cAgree">Do you agree with the AI suggestion?</label><select id="cAgree"><option value="true">Yes, as suggested</option><option value="false">No, I changed it</option></select></div>
+    <div class="row" style="margin-top:8px">${blind?"":`<div><label for="cAgree">Do you agree with the AI suggestion?</label><select id="cAgree"><option value="true">Yes, as suggested</option><option value="false">No, I changed it</option></select></div>`}
       <div><label for="cStat">Outcome</label><select id="cStat"><option value="coded">Coded</option><option value="accepted">Accepted, coding later</option><option value="returned">Return to the doctor</option></select></div></div>
-    <label for="cNote" style="margin-top:8px">Note (optional)</label><textarea id="cNote" rows="2">${esc(c.coder_note||"")}</textarea>
-    <div class="btns"><button id="cSave">Save</button><button class="sec" id="cClose">Close</button></div><div id="cMsg" class="hint"></div></div>`;
-  if(c.coder_agrees===false)$("cAgree").value="false";
+    <label for="cNote" style="margin-top:8px">Note (optional)</label><textarea id="cNote" rows="2">${esc(String(c.coder_note||"").replace(/^\[blind\] ?/,""))}</textarea>
+    <div class="btns"><button id="cSave">Save${blind?" my code":""}</button><button class="sec" id="cClose">Close</button></div><div id="cMsg" class="hint"></div></div>`;
+  if(!blind&&c.coder_agrees===false)$("cAgree").value="false";
+  $("c10").oninput=()=>{$("icdL").innerHTML=icdLinks($("c10").value);};
   $("cClose").onclick=()=>$("codePanel").innerHTML="";
   $("cSave").onclick=async()=>{
-    const {error}=await db.rpc("mccd_code",{p_cert:id,p_status:$("cStat").value,p_text:$("cText").value,p_icd10:$("c10").value,p_icd11:$("c11").value,p_agrees:$("cAgree").value==="true",p_note:$("cNote").value});
+    const mine=$("c10").value;
+    if(blind&&$("cStat").value==="coded"&&!norm10(mine)){$("cMsg").innerHTML='<span class="err">Enter your ICD-10 code first, or choose another outcome.</span>';return;}
+    const agrees=blind?(norm10(mine)!==""&&norm10(mine)===norm10(c.uc_icd10_ai)):$("cAgree").value==="true";
+    const note=(blind?"[blind] ":"")+$("cNote").value;
+    const {error}=await db.rpc("mccd_code",{p_cert:id,p_status:$("cStat").value,p_text:$("cText").value,p_icd10:mine,p_icd11:$("c11").value,p_agrees:agrees,p_note:note});
     if(error){$("cMsg").innerHTML='<span class="err">'+esc(error.message)+'</span>';return;}
-    $("codePanel").innerHTML='<p class="good">Saved.</p>';loadList();};
+    $("codePanel").innerHTML=blind?`<div class="uc" style="margin-top:12px"><p class="good">Your code is saved: <b>${esc(mine.toUpperCase()||"–")}</b>.</p><p>${aiLine}</p>
+      <p>${agrees?'<span class="good">Same ICD-10 code as the AI.</span>':'<span class="err">Different from the AI.</span> Your code stands; it is the final code.'}</p>${icdLinks(c.uc_icd10_ai)}</div>`:'<p class="good">Saved.</p>';
+    loadList();};
   const cp=$("codePanel");if(cp.scrollIntoView)cp.scrollIntoView({behavior:"smooth"});
 }
 start();
