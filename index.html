@@ -125,7 +125,7 @@ footer{text-align:center;font-size:.72rem;color:var(--mut);padding:10px 14px 24p
   <section class="card"><h2>Certificates checked</h2><div id="stats" class="hint"></div><div id="list" class="hint">…</div><div id="codePanel"></div></section>
 </div>
 </main>
-<footer>MCCD Checker pilot v0.1 · Institute of Public Health, Obafemi Awolowo University, Ile-Ife · No names stored; photos are not stored · AI suggestions must be confirmed by the doctor and a trained coder</footer>
+<footer>MCCD Checker pilot v0.2 · Institute of Public Health, Obafemi Awolowo University, Ile-Ife · No names stored; photos are not stored · AI suggestions must be confirmed by the doctor and a trained coder</footer>
 
 <script>
 const SUPABASE_URL="https://xzwjhbepttecghwvoogz.supabase.co";
@@ -328,7 +328,7 @@ function drawUC(){
   $("ucBox").innerHTML=`<div class="uc"><b>Suggested underlying cause</b> <span class="pill">for the coder to confirm</span><br>
     ${C.codable===false?'<span class="err">Not codable as written.</span> ':""}${esc(u.text||"–")}<br>
     ICD-10: <b>${esc(u.icd10||"–")}</b> · ICD-11: <b>${esc(u.icd11||"–")}</b> · confidence: ${esc(u.confidence||"–")}
-    ${u.reason?`<div class="hint" style="margin-top:4px">${esc(u.reason)}</div>`:""}${imp}</div>`;
+    ${u.reason?`<div class="hint" style="margin-top:4px">${esc(u.reason)}</div>`:""}${icdLinks(u.icd10)}${imp}</div>`;
   const b=$("useImp");if(b)b.onclick=()=>{readGrid(C.final);const prev=JSON.parse(JSON.stringify(C.final));LINES.forEach(k=>{const t=(C.improved[k]||"").trim();
     const src=t?LINES.find(o=>prev[o].t&&prev[o].t.toLowerCase()===t.toLowerCase()):null;
     C.final[k]={t,i:t&&src?prev[src].i:""};});
@@ -362,6 +362,10 @@ function reset(){C=null;$("s2").classList.add("hidden");$("s4").classList.add("h
 $("again").onclick=reset;
 
 // ================= list and coding =================
+const ICD10_URL="https://icd.who.int/browse10/2019/en",ICD11_URL="https://icd.who.int/browse/2026-01/mms/en";
+function icdLinks(c10){const q=String(c10||"").trim().toUpperCase();
+  return `<div class="btns" style="margin-top:6px"><a class="pill" style="padding:6px 10px" target="_blank" rel="noopener" href="${ICD10_URL}${/^[A-Z]\d\d(\.\d)?$/.test(q)?"#/"+q:""}">Open ICD-10 browser${q?" ("+esc(q)+")":""} ↗</a><a class="pill" style="padding:6px 10px" target="_blank" rel="noopener" href="${ICD11_URL}">Open ICD-11 browser ↗</a></div>`;}
+
 let LIST=[];
 const STAT={checked:"waiting for coder",returned:"returned to doctor",accepted:"accepted",coded:"coded"};
 async function loadList(){
@@ -397,6 +401,8 @@ async function openCode(id){
     <label for="cText">Underlying cause (your decision)</label><input id="cText" value="${esc(c.uc_text_final||c.uc_text_ai||"")}">
     <div class="row" style="margin-top:8px"><div><label for="c10">ICD-10 code</label><input id="c10" value="${esc(c.uc_icd10_final||c.uc_icd10_ai||"")}"></div>
       <div><label for="c11">ICD-11 code</label><input id="c11" value="${esc(c.uc_icd11_final||c.uc_icd11_ai||"")}"></div></div>
+    ${icdLinks(c.uc_icd10_final||c.uc_icd10_ai)}
+    <p class="hint">Look up or confirm the code in WHO's official browsers. For mortality, apply the ICD-10 Volume 2 / ICD-11 Reference Guide selection rules.</p>
     <div class="row" style="margin-top:8px"><div><label for="cAgree">Do you agree with the AI suggestion?</label><select id="cAgree"><option value="true">Yes, as suggested</option><option value="false">No, I changed it</option></select></div>
       <div><label for="cStat">Outcome</label><select id="cStat"><option value="coded">Coded</option><option value="accepted">Accepted, coding later</option><option value="returned">Return to the doctor</option></select></div></div>
     <label for="cNote" style="margin-top:8px">Note (optional)</label><textarea id="cNote" rows="2">${esc(c.coder_note||"")}</textarea>
